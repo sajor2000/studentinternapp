@@ -76,6 +76,8 @@ AZURE_STORAGE_CONNECTION_STRING
 AZURE_STORAGE_CONTAINER=summer-intern-uploads
 CONTEXT7_ENABLED=false
 CONTEXT7_API_KEY
+PUBMED_MCP_ENABLED=false
+PUBMED_MCP_URL=https://pubmed.caseyjhand.com/mcp
 MONTHLY_TOKEN_BUDGET_USD
 PER_USER_DAILY_BUDGET_USD
 MAX_PREVIEW_ROWS
@@ -105,6 +107,45 @@ generic public library documentation. Keep it `false` until you intentionally
 want docs lookup in the deployed app. `CONTEXT7_API_KEY` is required for the
 server-side SDK when Context7 is enabled; use a free Context7 key if appropriate.
 Never put Context7 values in `NEXT_PUBLIC_*`.
+
+For production PubMed literature lookup, the simplest setup is to enable the
+hosted PubMed MCP endpoint as server-side Vercel env only:
+
+```bash
+PUBMED_MCP_ENABLED=true
+PUBMED_MCP_URL=https://pubmed.caseyjhand.com/mcp
+```
+
+Do not prefix these with `NEXT_PUBLIC_`. The app only exposes PubMed MCP tools
+for literature-like prompts from server routes. After redeployment, log in and
+ask a literature-style question, for example:
+
+```text
+Search PubMed for recent studies on asthma disparities and give PMID/DOI citations.
+```
+
+For a more controlled production setup, self-host `cyanheads/pubmed-mcp-server`
+and point `PUBMED_MCP_URL` at your own HTTPS endpoint:
+
+```bash
+MCP_TRANSPORT_TYPE=http
+MCP_HTTP_PORT=3010
+MCP_HTTP_ENDPOINT_PATH=/mcp
+NCBI_API_KEY=optional-but-recommended
+NCBI_ADMIN_EMAIL=your-admin-email
+```
+
+Then set:
+
+```bash
+PUBMED_MCP_ENABLED=true
+PUBMED_MCP_URL=https://your-pubmed-mcp-host.example.org/mcp
+```
+
+Keep `NCBI_API_KEY` only on the PubMed MCP host, not in browser code. Treat
+PubMed MCP as an external public-literature service only. Do not send PHI,
+private file names, database URLs, Blob paths, SAS URLs, row-level records, or
+controlled dataset values.
 
 Legacy or alternate storage env vars are not required for the current Azure Blob path:
 
@@ -148,6 +189,7 @@ SUPABASE_SERVICE_ROLE_KEY
 - [ ] Azure Storage CORS allows only local development and the production Vercel origin.
 - [ ] Azure budget alerts and lifecycle policy are configured.
 - [ ] If `CONTEXT7_ENABLED=true`, verify a generic public docs lookup works and a sensitive-looking query is blocked before intern access.
+- [ ] If `PUBMED_MCP_ENABLED=true`, verify an authenticated literature-style chat prompt returns PMID/DOI citations and sensitive-looking PubMed MCP input is blocked before intern access.
 
 The preflight command checks only configuration shape and secret presence. It does not print secret values and does not replace live smoke tests for Foundry calls, Neon read-only access, or Azure Blob upload/open behavior.
 
@@ -210,6 +252,16 @@ If Context7 is enabled, use a generic public-docs prompt for the smoke pass, suc
 as “Use current public docs to explain a Next.js route handler.” Do not include
 project data, PHI, PII, secrets, file names, database URLs, or controlled dataset
 values in Context7 smoke prompts.
+
+If PubMed MCP is enabled, run a live authenticated chat smoke test after
+deployment with a public-literature prompt:
+
+```text
+Search PubMed for recent studies on asthma disparities and give PMID/DOI citations.
+```
+
+Do not include PHI, private file names, database URLs, Blob paths, SAS URLs,
+row-level records, or controlled dataset values in PubMed smoke prompts.
 
 The script verifies login, `/api/me`, Neon schema access for a Neon-enabled intern,
 Neon blocking for a PHI-local intern, limited SELECT-only query preview, unsafe

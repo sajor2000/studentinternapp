@@ -1,0 +1,27 @@
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Local private handoff files and controlled data
+artifacts/private/
+data/private/
+data/
+*.csv
+*.tsv
+*.parquet
+*.dump
+*.backup
+
+# Local development and build output
+node_modules/
+.next/
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Editor and OS files
+.DS_Store
+.vscode/
+.idea/

@@ -38,6 +38,7 @@ function compileTargetModules() {
         "app/lib/dataset-recipes.ts",
         "app/lib/env.ts",
         "app/lib/pii-guard.ts",
+        "app/lib/pubmed-mcp.ts",
         "app/lib/rate-limit.ts",
         "app/lib/request-security.ts",
         "app/lib/request-size.ts",
@@ -257,6 +258,19 @@ try {
       assert(chatRouteSource.includes(command), `${command} should be advertised in the chat system prompt.`);
       assert(aiModelSource.includes(command), `${command} should be covered by model routing.`);
     }
+  });
+
+  check("PubMed MCP wrapper is opt-in and guarded", () => {
+    const pubMedSource = readFileSync(resolve(repoRoot, "app/lib/pubmed-mcp.ts"), "utf8");
+    const chatRouteSource = readFileSync(resolve(repoRoot, "app/api/chat/route.ts"), "utf8");
+    const aiRouteSource = readFileSync(resolve(repoRoot, "app/api/ai/route.ts"), "utf8");
+
+    assert(pubMedSource.includes("PUBMED_MCP_ENABLED"), "PubMed MCP should be explicitly enabled by env.");
+    assert(pubMedSource.includes("messagesAskForLiterature"), "PubMed MCP should be gated to literature-like prompts.");
+    assert(pubMedSource.includes("assertPubMedInputIsSafe"), "PubMed MCP tool inputs should have a local safety guard.");
+    assert(pubMedSource.includes("https://pubmed.caseyjhand.com/mcp"), "PubMed MCP should document the default hosted endpoint.");
+    assert(chatRouteSource.includes("getPubMedMcpToolContext"), "Chat route should expose PubMed MCP tools when applicable.");
+    assert(aiRouteSource.includes("getPubMedMcpToolContext"), "Non-chat AI route should expose PubMed MCP tools when applicable.");
   });
 
   check("model routing reserves premium for final review", () => {

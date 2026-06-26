@@ -1808,6 +1808,48 @@ h3 {
   line-height: 1.45;
 }
 
+.vc-start-steps {
+  width: min(100%, 640px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vc-start-step {
+  min-height: 92px;
+  border: 1px solid #dbe2ea;
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  color: #475569;
+  background: #f8fafc;
+  text-align: left;
+}
+
+.vc-start-step svg {
+  margin-top: 2px;
+  color: #0f766e;
+}
+
+.vc-start-step strong,
+.vc-start-step small {
+  display: block;
+}
+
+.vc-start-step strong {
+  color: #111827;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.vc-start-step small {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .vc-suggestions {
   margin-top: 8px;
   width: min(100%, 760px);
@@ -2556,7 +2598,16 @@ h3 {
   }
 
   .vc-main {
+    order: 1;
     min-height: 720px;
+  }
+
+  .vc-artifact {
+    order: 2;
+  }
+
+  .vc-sidebar {
+    order: 3;
   }
 
   .vc-header {
@@ -2564,9 +2615,23 @@ h3 {
     flex-direction: column;
   }
 
+  .vc-status-pills {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .vc-start-steps,
   .vc-suggestions,
   .vc-ce-grid {
     grid-template-columns: 1fr;
+  }
+
+  .vc-start-step {
+    min-height: auto;
+  }
+
+  .vc-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -2901,8 +2966,10 @@ h3 {
 
 .guide-hero,
 .guide-section {
+  width: min(100%, 1040px);
   max-width: 1040px;
   margin: 0 auto 18px;
+  min-width: 0;
 }
 
 .guide-hero {
@@ -2956,6 +3023,7 @@ h3 {
 
 .guide-card,
 .guide-command {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
@@ -2990,11 +3058,13 @@ h3 {
 }
 
 .guide-command-list {
+  min-width: 0;
   display: grid;
   gap: 10px;
 }
 
 .guide-command pre {
+  max-width: 100%;
   margin: 8px 0;
   overflow-x: auto;
   border-radius: 8px;
@@ -3114,6 +3184,7 @@ h3 {
 
 .vc-header h1,
 .vc-greeting h2,
+.vc-start-step strong,
 .vc-panel-heading h2,
 .vc-panel-card h2,
 .vc-panel-card h3,
@@ -3138,6 +3209,8 @@ h3 {
 .vc-history-item small,
 .vc-empty-note,
 .vc-greeting p,
+.vc-start-step,
+.vc-start-step small,
 .vc-message-content.muted,
 .vc-panel-heading p,
 .vc-table-list span,
@@ -3159,6 +3232,7 @@ h3 {
 .vc-status-pills button,
 .vc-badge,
 .vc-suggestions button,
+.vc-start-step,
 .vc-prompt,
 .vc-prompt-tools button,
 .vc-tabs,
@@ -3519,5 +3593,59 @@ h3 {
 @media (max-width: 820px) {
   .vc-message.user .vc-message-content {
     max-width: min(88%, 560px);
+  }
+
+  .vc-app,
+  .vc-app.panel-open,
+  .vc-main,
+  .vc-chat-panel,
+  .vc-messages,
+  .vc-message,
+  .vc-message-content,
+  .vc-code-block,
+  .vc-artifact,
+  .vc-panel-card {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .vc-app.panel-open {
+    grid-template-columns: 1fr;
+  }
+
+  .vc-message-content {
+    overflow-wrap: anywhere;
+  }
+
+  .vc-message-content code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .vc-code-block pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .vc-panel-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vc-artifact-actions {
+    justify-content: flex-start;
+  }
+
+  .vc-artifact-actions button {
+    flex: 1 1 120px;
+    justify-content: center;
+  }
+
+  .vc-preview-card {
+    min-height: 480px;
+  }
+
+  .vc-preview-card iframe {
+    min-height: 360px;
   }
 }

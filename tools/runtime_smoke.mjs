@@ -1044,13 +1044,18 @@ async function assertBlobUpload(ownerSession, otherInternSession, adminSession) 
   );
 
   const otherList = await getWithCookie("/api/files", otherInternSession.cookie);
+  const otherListIsIsolated =
+    (otherList.response.status === 403 && otherList.body.ok === false) ||
+    (
+      otherList.response.ok &&
+      otherList.body.ok === true &&
+      !otherList.body.files?.some((file) => file.id === uploadedFileId)
+    );
 
   addCheck(
     `${otherInternSession.username} file list isolation`,
-    otherList.response.ok &&
-      otherList.body.ok === true &&
-      !otherList.body.files?.some((file) => file.id === uploadedFileId),
-    "A different intern does not see the owner's private upload metadata.",
+    otherListIsIsolated,
+    "A different intern cannot see the owner's private upload metadata.",
   );
 
   const otherOpenResponse = await fetch(`${baseUrl}/api/files/open?id=${encodeURIComponent(uploadedFileId)}`, {

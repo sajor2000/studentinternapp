@@ -30,6 +30,7 @@ HHS guidance describes two HIPAA de-identification approaches, Expert Determinat
 | PHI file names leak identifiers | Store blobs under generated UUID paths; do not put original file names in blob paths or model context |
 | Password list leaks | Hash passwords; do not commit `.env`; rotate passwords if exposed |
 | External documentation MCP receives sensitive context | Use Context7 only for generic public library documentation lookups; do not send PHI, PII, credentials, database URLs, row-level records, private source code, private file names, or controlled data values |
+| External literature MCP receives sensitive context | Use PubMed MCP only for public biomedical literature, citation, MeSH, PMID/PMCID/DOI, PubMed Central, and Europe PMC lookups; do not send PHI, PII, credentials, private URLs, database URLs, Blob paths, SAS URLs, row-level records, controlled dataset values, or private project details |
 
 ## Authentication
 
@@ -127,6 +128,31 @@ Context7 MCP may be used by coding agents to retrieve current public documentati
 Context7 is not an approved destination for PHI, PII, controlled row-level extracts, credentials, database URLs, private file names, private source code, or proprietary project details. Documentation queries must be generic, for example "Next.js route handler file upload limits" rather than a query containing a real storage path, patient column, intern name, or dataset value.
 
 Context7 credentials, if used, belong in local MCP configuration or environment variables only. They must not be committed to this repository.
+
+## External literature MCP policy
+
+PubMed MCP may be enabled server-side for public biomedical literature lookup
+through cyanheads/pubmed-mcp-server. It is an external MCP boundary, not a place
+for controlled data. The app only exposes its tools for literature-like prompts
+and blocks obvious identifiers, credentials, database URLs, private URLs, Blob
+paths, and SAS tokens in tool inputs.
+
+For the simplest production setup, enable the hosted PubMed MCP endpoint with
+server-side Vercel env vars only:
+
+```text
+PUBMED_MCP_ENABLED=true
+PUBMED_MCP_URL=https://pubmed.caseyjhand.com/mcp
+```
+
+Do not use `NEXT_PUBLIC_` for PubMed MCP configuration. If the team self-hosts
+`cyanheads/pubmed-mcp-server`, keep `NCBI_API_KEY` only on that MCP host and
+point `PUBMED_MCP_URL` at the host's HTTPS `/mcp` endpoint.
+
+Do not send PHI, PII, row-level records, controlled HealthMap data values,
+private file names, private project details, credentials, database URLs, Blob
+paths, or SAS URLs to PubMed MCP. Prefer public biomedical concepts, citation
+metadata, PMID/PMCID/DOI values, MeSH terms, and publication filters.
 
 ## Logging policy
 

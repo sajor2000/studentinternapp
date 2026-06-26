@@ -19,6 +19,7 @@ Planning and application repository for a low-cost web portal that helps 6 summe
 - **Live-DB parity source:** `/Users/JCR/Downloads/Other/healthmap_azure_dev_live_2026-06-25.dump`; restore it into Neon as the native `public` schema.
 - **Embedded skills:** Ward Snapshot artifact skills plus the full 27-skill Compound Engineering plugin catalog are available directly in the chat UI.
 - **External docs MCP:** Context7 MCP is allowed for generic public library/framework documentation lookups only. Do not send PHI, PII, credentials, database URLs, row-level records, private source code, private file names, or controlled HealthMap data values to Context7.
+- **PubMed MCP:** cyanheads/pubmed-mcp-server can be enabled server-side for public biomedical literature, citation, PMID/PMCID/DOI, MeSH, PubMed Central, and Europe PMC lookups. It is disabled by default and is never called directly from browser code.
 - **CE workspace docs:** brainstorms, plans, work logs, reviews, and compound learnings are stored per intern/project in portal metadata; private by default, admin-visible, and promotable to shared cohort-safe learnings.
 - **Artifact preview and publishing:** generated fenced HTML artifacts open in a sandboxed side panel. All uploaded files go to private Azure Blob paths owned by the signed-in user. Uploaded HTML, Word, and PowerPoint files become private draft artifact records that owners/admins can publish to the cohort.
 - **Intern workflow:** guided ward snapshot builder, SQL explanation, saved dataset recipes, Word/PPT/HTML artifact drafts, deterministic Python/R/Jupyter/marimo recipe starters, approved local or Rush-machine notebooks, exported HTML reports, and approved PHI-scrubbed data, notebook, and code files uploaded to private Azure Blob storage.
@@ -215,6 +216,55 @@ CONTEXT7_API_KEY=""
 ```
 
 Set these as Vercel environment variables, not browser-exposed variables. `CONTEXT7_API_KEY` is required when `CONTEXT7_ENABLED=true`; use a free Context7 key if appropriate. The route blocks sensitive-looking Context7 queries and the system prompt instructs the model to use generic documentation lookups only.
+
+## PubMed MCP literature lookup
+
+The chat and authenticated `/api/ai` routes can use
+[cyanheads/pubmed-mcp-server](https://github.com/cyanheads/pubmed-mcp-server)
+through the AI SDK MCP client. For production, the simplest setup is to enable
+the hosted PubMed MCP endpoint as server-side Vercel environment variables:
+
+```bash
+PUBMED_MCP_ENABLED=true
+PUBMED_MCP_URL=https://pubmed.caseyjhand.com/mcp
+```
+
+Do not prefix these with `NEXT_PUBLIC_`; the browser must never connect to MCP
+directly. After redeploying, log in and ask a literature-style question such as:
+
+```text
+Search PubMed for recent studies on asthma disparities and give PMID/DOI citations.
+```
+
+`PUBMED_MCP_URL` defaults to the public hosted endpoint above. The app only
+exposes PubMed tools to the model when the latest prompt looks like a literature,
+citation, PMID/PMCID/DOI, MeSH, or biomedical evidence request. Tool inputs are
+blocked if they contain obvious identifiers, credentials, database URLs, storage
+tokens, or private URLs.
+
+For a more controlled production setup, self-host `cyanheads/pubmed-mcp-server`
+and point `PUBMED_MCP_URL` at your own HTTPS endpoint:
+
+```bash
+MCP_TRANSPORT_TYPE=http
+MCP_HTTP_PORT=3010
+MCP_HTTP_ENDPOINT_PATH=/mcp
+NCBI_API_KEY=optional-but-recommended
+NCBI_ADMIN_EMAIL=your-admin-email
+```
+
+Then set the app environment to:
+
+```bash
+PUBMED_MCP_ENABLED=true
+PUBMED_MCP_URL=https://your-pubmed-mcp-host.example.org/mcp
+```
+
+Keep `NCBI_API_KEY` only on the PubMed MCP host, not in browser code. Treat
+PubMed MCP as an external public-literature service only: do not send PHI,
+private file names, database URLs, Blob paths, SAS URLs, row-level records, or
+controlled dataset values. After PubMed env changes, run the normal deployment
+checks and a live authenticated chat smoke test.
 
 Current Azure target:
 

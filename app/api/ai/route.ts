@@ -1,8 +1,9 @@
-import { convertToModelMessages, generateText, type UIMessage } from "ai";
+import { convertToModelMessages, generateText, type ToolSet, type UIMessage } from "ai";
 import { canAccessNeon, canUsePhiLocalWorkflow, getSession } from "@/app/lib/auth";
 import { ChatInputValidationError, isAiChatEnabled, validateAiRequestContentLength, validateChatMessagesForAi } from "@/app/lib/ai-controls";
 import { chooseModelTier, getModelForTier, getModelRouteLabel } from "@/app/lib/ai-model";
 import { inspectMessagesForPii } from "@/app/lib/pii-guard";
+import { getPubMedMcpToolContext } from "@/app/lib/pubmed-mcp";
 import { checkAiRequestRateLimit } from "@/app/lib/rate-limit";
 import { rejectCrossSiteRequest } from "@/app/lib/request-security";
 import { checkAiBudget, recordAiPreRoutingBlock, recordAiUsage } from "@/app/lib/usage";
@@ -106,11 +107,23 @@ export async function POST(request: Request) {
     const modelRouteLabel = getModelRouteLabel(modelTier);
     const neonEnabled = canAccessNeon(user);
     const phiLocalEnabled = canUsePhiLocalWorkflow(user);
+    let pubMedMcp = null as Awaited<ReturnType<typeof getPubMedMcpToolContext>>;
+    let pubMedMcpSystemPrompt: string | null = null;
+
+    try {
+      pubMedMcp = await getPubMedMcpToolContext(piiCheck.messages);
+      pubMedMcpSystemPrompt = pubMedMcp?.systemPrompt ?? null;
+    } catch {
+      console.error("PubMed MCP tools are configured but unavailable.");
+      pubMedMcpSystemPrompt =
+        "PubMed MCP literature tools are configured but unavailable for this request. If the user asks for live PubMed lookup, say the lookup tool is temporarily unavailable and answer only from local context or general knowledge.";
+    }
     const systemText = [
       "You are RHEAS Intern AI Chat server-side automation.",
       "Use the configured model route; never ask the intern for API keys, model names, database URLs, credentials, or Blob storage keys.",
       "Prefer CE workflow habits, safe SQL, and copyable local Python, R, Jupyter, or marimo code when coding help is requested.",
       "For PHI-local work, use schema and masked examples when possible, avoid unnecessary direct identifiers, and remind users to run code only in an approved local or Rush environment.",
+      pubMedMcpSystemPrompt,
     ].join("\n");
 
     try {
@@ -133,6 +146,7 @@ export async function POST(request: Request) {
           .filter(Boolean)
           .join("\n"),
         messages: await convertToModelMessages(piiCheck.messages),
+        tools: pubMedMcp?.tools as ToolSet | undefined,
       });
 
       await recordAiUsage({
@@ -166,6 +180,8 @@ export async function POST(request: Request) {
         { ok: false, error: "AI generation failed. Check server-side Foundry/Azure configuration." },
         { status: 503, headers: noStoreHeaders },
       );
+    } finally {
+      await pubMedMcp?.close().catch(() => undefined);
     }
   } catch (error) {
     if (error instanceof ChatInputValidationError) {

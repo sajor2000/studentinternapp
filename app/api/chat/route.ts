@@ -5,6 +5,7 @@ import { chooseModelTier, getModelForTier, getModelRouteLabel } from "../../lib/
 import { chicagoHealthMapArtifactDesignPrompt } from "../../lib/artifact-design";
 import { getContext7SystemPrompt, getContext7Tools } from "../../lib/context7-docs";
 import { inspectMessagesForPii } from "../../lib/pii-guard";
+import { getPubMedMcpToolContext } from "../../lib/pubmed-mcp";
 import { checkAiRequestRateLimit } from "../../lib/rate-limit";
 import { rejectCrossSiteRequest } from "../../lib/request-security";
 import { formatSchemaForPrompt, getHealthmapSchema } from "../../lib/schema-context";
@@ -78,6 +79,23 @@ export async function POST(request: Request) {
     const schema = neonEnabled ? await getHealthmapSchema() : null;
     const context7Tools = getContext7Tools();
     const context7SystemPrompt = getContext7SystemPrompt();
+    let pubMedMcp = null as Awaited<ReturnType<typeof getPubMedMcpToolContext>>;
+    let pubMedMcpSystemPrompt: string | null = null;
+
+    try {
+      pubMedMcp = await getPubMedMcpToolContext(piiCheck.messages);
+      pubMedMcpSystemPrompt = pubMedMcp?.systemPrompt ?? null;
+    } catch {
+      console.error("PubMed MCP tools are configured but unavailable.");
+      pubMedMcpSystemPrompt =
+        "PubMed MCP literature tools are configured but unavailable for this request. If the user asks for live PubMed lookup, say the lookup tool is temporarily unavailable and answer only from local context or general knowledge.";
+    }
+
+    const tools = {
+      ...(context7Tools ?? {}),
+      ...(pubMedMcp?.tools ?? {}),
+    };
+    const hasTools = Object.keys(tools).length > 0;
     const maskingNotice = piiCheck.masked
       ? `Server-side safety note: identifier values that were not needed for the coding request were masked before this model call. Masked categories: ${piiCheck.categories.join(", ")}. Continue helping with coding, schema design, aggregate methods, and local-safe workflows. If PHI is necessary to produce correct code, use the minimum necessary context and do not ask for original values when schema, structure, or masked examples are enough.`
       : null;
@@ -85,6 +103,8 @@ export async function POST(request: Request) {
     const result = streamText({
       model: getModelForTier(modelTier),
       onError: async () => {
+        await pubMedMcp?.close().catch(() => undefined);
+
         try {
           await recordAiUsage({
             username: user.username,
@@ -98,6 +118,8 @@ export async function POST(request: Request) {
         }
       },
       onFinish: async ({ usage }) => {
+        await pubMedMcp?.close().catch(() => undefined);
+
         try {
           await recordAiUsage({
             username: user.username,
@@ -141,6 +163,7 @@ export async function POST(request: Request) {
         "The chat UI has embedded portal skills out of the box: Ward Snapshot, Word Brief, PPT Deck, HTML Snapshot, Ward Data Query, and Artifact Review.",
         "The chat UI also embeds the full Compound Engineering plugin skill inventory as chat launchers: /ce-strategy, /ce-ideate, /ce-brainstorm, /ce-plan, /ce-work, /ce-work-beta, /ce-worktree, /ce-simplify-code, /ce-debug, /ce-optimize, /ce-code-review, /ce-doc-review, /ce-resolve-pr-feedback, /ce-test-browser, /ce-test-xcode, /ce-dogfood-beta, /ce-polish, /ce-compound, /ce-compound-refresh, /ce-product-pulse, /ce-riffrec-feedback-analysis, /ce-proof, /ce-promote, /ce-commit, /ce-commit-push-pr, /ce-setup, and /lfg.",
         "When the user invokes one of those skills, follow that skill's requested structure directly without requiring external plugin installation, but frame it as a guided exercise with checkpoints.",
+        pubMedMcpSystemPrompt,
         "Write for civic leaders: concise, plain-language, actionable, and careful about uncertainty.",
         "For Word outputs, provide document sections, concise narrative, figure/table captions, source notes, and limitations.",
         "For PowerPoint outputs, provide slide titles, bullets, speaker notes, and chart specifications.",
@@ -159,8 +182,8 @@ export async function POST(request: Request) {
         .filter(Boolean)
         .join("\n"),
       messages: await convertToModelMessages(piiCheck.messages),
-      tools: context7Tools,
-      stopWhen: context7Tools ? stepCountIs(3) : stepCountIs(1),
+      tools: hasTools ? tools : undefined,
+      stopWhen: hasTools ? stepCountIs(pubMedMcp ? 4 : 3) : stepCountIs(1),
     });
 
     const response = result.toUIMessageStreamResponse();

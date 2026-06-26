@@ -1203,6 +1203,25 @@ function applyChicagoHealthMapPreviewDesign(html: string): string {
   return `<!doctype html><html><head><meta charset="utf-8">${styleTag}</head><body>${html}</body></html>`;
 }
 
+function stripHtmlTags(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getGeneratedArtifactDisplayName(html: string, fallbackTitle: string): string {
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const headingMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  const title = stripHtmlTags(titleMatch?.[1] ?? headingMatch?.[1] ?? "");
+
+  if (title) {
+    return title.slice(0, 120);
+  }
+
+  return fallbackTitle === "New chat" ? "Generated HTML artifact" : fallbackTitle;
+}
+
 function InlineText({ text }: { text: string }) {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter(Boolean);
 
@@ -1390,6 +1409,7 @@ export function ChatShell({ session }: { session: SessionUser }) {
   const [starterLanguage, setStarterLanguage] = useState<StarterLanguage>("python");
   const [publishingArtifactId, setPublishingArtifactId] = useState<string | null>(null);
   const [isSavingGeneratedArtifact, setIsSavingGeneratedArtifact] = useState(false);
+  const [artifactIterationMode, setArtifactIterationMode] = useState<"design" | "data" | null>(null);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
   const [selectedPrivateFileId, setSelectedPrivateFileId] = useState<string | null>(null);
   const [fileStarterLanguage, setFileStarterLanguage] = useState<StarterLanguage>("python");
@@ -1408,6 +1428,18 @@ export function ChatShell({ session }: { session: SessionUser }) {
   });
 
   const isBusy = status === "submitted" || status === "streaming";
+  const messagePersistenceSignature = useMemo(
+    () =>
+      JSON.stringify(
+        messages.map((message) => ({
+          id: message.id,
+          role: message.role,
+          text: getMessageText(message),
+        })),
+      ),
+    [messages],
+  );
+  const messagesForPersistence = useMemo(() => messages, [messagePersistenceSignature]);
   const activeChatTitle = useMemo(() => getSessionTitle(messages), [messages]);
   const latestHtmlArtifact = useMemo(() => findLatestHtmlArtifact(messages), [messages]);
   const latestCodeArtifact = useMemo(() => findLatestCodeArtifact(messages), [messages]);
@@ -1466,6 +1498,13 @@ export function ChatShell({ session }: { session: SessionUser }) {
   }, []);
 
   const refreshFiles = useCallback(async () => {
+    if (session.role !== "admin" && !phiLocalWorkflowEnabled) {
+      setFileRecords([]);
+      setFileError(null);
+      setFilesLoaded(true);
+      return;
+    }
+
     try {
       const response = await fetch("/api/files", { headers: { accept: "application/json" } });
       const data = (await response.json()) as FileListResponse;
@@ -1481,7 +1520,7 @@ export function ChatShell({ session }: { session: SessionUser }) {
     } finally {
       setFilesLoaded(true);
     }
-  }, []);
+  }, [phiLocalWorkflowEnabled, session.role]);
 
   const refreshAdminUsage = useCallback(async () => {
     if (session.role !== "admin") {
@@ -1624,9 +1663,9 @@ export function ChatShell({ session }: { session: SessionUser }) {
         } satisfies ChatSession);
       const nextSession: ChatSession = {
         ...existingSession,
-        title: getSessionTitle(messages),
-        messages,
-        updatedAt: messages.length > 0 ? Date.now() : existingSession.updatedAt,
+        title: getSessionTitle(messagesForPersistence),
+        messages: messagesForPersistence,
+        updatedAt: messagesForPersistence.length > 0 ? Date.now() : existingSession.updatedAt,
       };
       const otherSessions = currentSessions.filter((chatSession) => chatSession.id !== activeSessionId);
       const nextSessions = [nextSession, ...otherSessions]
@@ -1672,7 +1711,7 @@ export function ChatShell({ session }: { session: SessionUser }) {
     return () => {
       window.clearTimeout(saveTimer);
     };
-  }, [activeSessionId, messages, sessionsLoaded]);
+  }, [activeSessionId, messagesForPersistence, sessionsLoaded]);
 
   useEffect(() => {
     void refreshArtifacts();
@@ -1785,6 +1824,33 @@ export function ChatShell({ session }: { session: SessionUser }) {
 
     return prompts;
   }, [neonWorkflowEnabled, phiLocalWorkflowEnabled]);
+  const workflowChecklist = useMemo(() => {
+    const items = [
+      neonWorkflowEnabled
+        ? {
+            title: "Use Neon for de-identified HealthMap tables",
+            text: schema?.ok ? `${schema.tableCount} tables are ready for read-only preview.` : "Schema browsing appears after the read-only role is configured.",
+          }
+        : {
+            title: "Use local or Rush-machine analysis",
+            text: "This account is set up for PHI-scrubbed notebook, Python, or R workflows.",
+          },
+      {
+        title: "Run notebooks on Rush or local compute",
+        text: "Use the portal for guidance, previews, recipes, and artifacts; run Python, R, Jupyter, or marimo on approved machines.",
+      },
+      {
+        title: "Start with Compound Engineering",
+        text: "Brainstorm, plan, work, review, then save reusable learnings for the cohort.",
+      },
+      {
+        title: "Keep secrets and row-level data out of chat",
+        text: "Use schema, masked examples, private file records, and aggregate outputs.",
+      },
+    ];
+
+    return items;
+  }, [neonWorkflowEnabled, schema]);
   const featuredSkills = useMemo(() => {
     const neonSkillIds = new Set(["ward-snapshot", "word-brief", "ppt-deck", "html-snapshot", "data-query"]);
     const phiLocalSkillIds = new Set(["phi-csv", "artifact-review"]);
@@ -2014,7 +2080,7 @@ export function ChatShell({ session }: { session: SessionUser }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           html: previewHtmlArtifact,
-          displayName: activeChatTitle === "New chat" ? "Generated HTML artifact" : activeChatTitle,
+          displayName: getGeneratedArtifactDisplayName(previewHtmlArtifact, activeChatTitle),
           projectLabel: "Generated in chat",
         }),
       });
@@ -2031,6 +2097,62 @@ export function ChatShell({ session }: { session: SessionUser }) {
       setArtifactError(artifactFailure instanceof Error ? artifactFailure.message : "Generated artifact save failed.");
     } finally {
       setIsSavingGeneratedArtifact(false);
+    }
+  }
+
+  async function getCurrentArtifactHtml(): Promise<string | null> {
+    if (selectedArtifactUrl && selectedArtifactIsHtml) {
+      const response = await fetch(selectedArtifactUrl, { headers: { accept: "text/html" } });
+
+      if (!response.ok) {
+        throw new Error("Current artifact HTML could not be opened for iteration.");
+      }
+
+      return response.text();
+    }
+
+    return previewHtmlArtifact;
+  }
+
+  async function submitArtifactIteration(mode: "design" | "data") {
+    if (isBusy || artifactIterationMode) {
+      return;
+    }
+
+    setArtifactIterationMode(mode);
+    setArtifactError(null);
+    clearError();
+
+    try {
+      const html = await getCurrentArtifactHtml();
+
+      if (!html) {
+        throw new Error("Open or generate an HTML artifact before starting an iteration loop.");
+      }
+
+      const referenceRows = queryPreview
+        ? JSON.stringify(
+            {
+              columns: queryPreview.columns,
+              rows: queryPreview.rows.slice(0, 20),
+              rowCount: queryPreview.rowCount,
+            },
+            null,
+            2,
+          )
+        : "No query preview rows are currently loaded. Do not invent new source values; ask for a preview query if more source data is needed.";
+      const instruction =
+        mode === "design"
+          ? "Revise the current HTML artifact design. Keep all data values and source/caveat wording unchanged unless there is an obvious formatting issue. Improve visual hierarchy, spacing, teal styling, and mobile readability. Return exactly one complete fenced html code block and no markdown outside the fence."
+          : "Audit the current HTML artifact for data fidelity. Compare against the reference rows below when available. Preserve only aggregate values. If a value is unsupported, correct it or mark it as needing a source preview. Return a concise fidelity note followed by exactly one complete fenced html code block.";
+
+      submitMessage(
+        `${instruction}\n\nCurrent artifact HTML:\n\`\`\`html\n${html.slice(0, 12000)}\n\`\`\`\n\nReference rows from the current in-app query preview:\n\`\`\`json\n${referenceRows}\n\`\`\``,
+      );
+    } catch (iterationFailure) {
+      setArtifactError(iterationFailure instanceof Error ? iterationFailure.message : "Artifact iteration could not start.");
+    } finally {
+      setArtifactIterationMode(null);
     }
   }
 
@@ -2336,12 +2458,11 @@ export function ChatShell({ session }: { session: SessionUser }) {
               {cePluginSkills.length} CE skills
             </span>
             <button
-              disabled={!hasArtifactPanelContent && !latestCodeArtifact}
               type="button"
-              onClick={() => openRightPanel(hasArtifactPanelContent ? "artifact" : "code")}
+              onClick={() => openRightPanel(hasArtifactPanelContent ? "artifact" : neonWorkflowEnabled ? "neon" : "plugin")}
             >
               <PanelRightOpen size={14} aria-hidden="true" />
-              Output pane
+              {hasArtifactPanelContent ? "Output pane" : "Tools pane"}
             </button>
           </div>
         </header>
@@ -2355,6 +2476,17 @@ export function ChatShell({ session }: { session: SessionUser }) {
                 </div>
                 <h2>What can I help with?</h2>
                 <p>Ask for a ward snapshot, a Neon query plan, a PHI file coding workflow, or a CE review.</p>
+                <div className="vc-start-steps" aria-label="Today's workflow">
+                  {workflowChecklist.map((item) => (
+                    <div className="vc-start-step" key={item.title}>
+                      <Check size={14} aria-hidden="true" />
+                      <span>
+                        <strong>{item.title}</strong>
+                        <small>{item.text}</small>
+                      </span>
+                    </div>
+                  ))}
+                </div>
                 <div className="vc-suggestions">
                   {featuredSkills.map((skill) => {
                     const Icon = skill.icon;
@@ -2545,6 +2677,34 @@ export function ChatShell({ session }: { session: SessionUser }) {
                   <p>Generated or uploaded HTML opens here without leaving chat.</p>
                 </div>
                 <div className="vc-artifact-actions">
+                  {previewHtmlArtifact || selectedArtifactIsHtml ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isBusy || artifactIterationMode !== null}
+                        onClick={() => submitArtifactIteration("design")}
+                      >
+                        {artifactIterationMode === "design" ? (
+                          <LoaderCircle className="spin" size={13} aria-hidden="true" />
+                        ) : (
+                          <Globe2 size={13} aria-hidden="true" />
+                        )}
+                        Revise design
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBusy || artifactIterationMode !== null}
+                        onClick={() => submitArtifactIteration("data")}
+                      >
+                        {artifactIterationMode === "data" ? (
+                          <LoaderCircle className="spin" size={13} aria-hidden="true" />
+                        ) : (
+                          <Database size={13} aria-hidden="true" />
+                        )}
+                        Check data
+                      </button>
+                    </>
+                  ) : null}
                   {previewHtmlArtifact ? (
                     <button type="button" disabled={isSavingGeneratedArtifact} onClick={() => saveGeneratedHtmlArtifact()}>
                       {isSavingGeneratedArtifact ? (
@@ -2874,11 +3034,11 @@ export function ChatShell({ session }: { session: SessionUser }) {
               </div>
               <div className="vc-starter-code">
                 <div className="vc-panel-heading">
-                  <div>
-                    <h3>Local starter code</h3>
-                    <p>Copy this to an approved local or Rush machine. Configure credentials outside the notebook or script.</p>
-                  </div>
-                </div>
+	                  <div>
+	                    <h3>Local starter code</h3>
+	                    <p>Copy this to an approved Rush or local machine. Configure credentials outside the notebook or script; Vercel does not run arbitrary analysis code.</p>
+	                  </div>
+	                </div>
                 <div className="vc-starter-tabs" role="tablist" aria-label="Starter code language">
                   {starterLanguageLabels.map((item) => (
                     <button

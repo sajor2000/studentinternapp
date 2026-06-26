@@ -63,7 +63,7 @@ export const setupCards = [
     title: "Local notebooks",
     icon: Braces,
     tone: "blue",
-    text: "Use guided Python, R, and marimo starters locally. Review and understand the code before publishing outputs.",
+    text: "Use guided Python, R, and marimo starters on approved Rush or local computers. Review and understand the code before publishing outputs.",
     source: "/docs/brainstorms/summer-intern-portal-requirements.md",
   },
 ] as const;
@@ -100,6 +100,10 @@ export const workflowSteps = [
   {
     title: "Use Compound Engineering for project work",
     body: "Learn the guided project loop: /ce-brainstorm to frame the project, /ce-plan to decide the work, /ce-work to execute, /ce-code-review to catch issues, and /ce-compound to save what you learned in your private workspace. The portal chooses the model route automatically.",
+  },
+  {
+    title: "Run analysis on approved compute",
+    body: "Use the portal to generate and review Python, R, Jupyter, or marimo code. Run that code on approved Rush or local computers, then upload reviewed aggregate HTML or document artifacts back to the portal.",
   },
   {
     title: "Use Neon MCP only for approved database exploration",
@@ -148,7 +152,12 @@ export const protectedDatasetModes = [
   {
     title: "Local analysis code",
     icon: Braces,
-    text: "Generate marimo, Jupyter/Python, or R templates that read local paths after approved private file records are downloaded and output aggregate tables or reviewed HTML.",
+    text: "Generate marimo, Jupyter/Python, or R templates in the portal, then run them on approved Rush or local computers after approved private file records are downloaded.",
+  },
+  {
+    title: "No cloud code sandbox",
+    icon: TerminalSquare,
+    text: "Do not run arbitrary intern Python/R inside Vercel. Keep Vercel for auth, AI guidance, read-only previews, recipes, usage logs, and artifact storage.",
   },
 ] as const;
 

@@ -96,10 +96,20 @@ export default async function HowToUsePage() {
               <h3>Local/Rush notebook workflow</h3>
               <p>
                 Download approved private file records, then run generated Python, R, Jupyter,
-                or marimo code only on an approved local or Rush machine.
+                or marimo code only on an approved local or Rush machine. The portal is not the
+                compute sandbox for arbitrary analysis code.
               </p>
             </article>
           ) : null}
+          <article className="guide-card">
+            <Braces size={22} aria-hidden="true" />
+            <h3>Compute boundary</h3>
+            <p>
+              Use Vercel for login, AI guidance, read-only Neon previews, recipes, usage tracking,
+              and artifact upload. Use approved Rush or local Python/R/marimo environments for full
+              analysis execution.
+            </p>
+          </article>
           <article className="guide-card">
             <GitBranch size={22} aria-hidden="true" />
             <h3>Compound Engineering plugin</h3>
