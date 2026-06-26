@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+
+# env/secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# builds
+.next/
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# data/artifacts
+*.sqlite
+*.db
+*.dump
+*.backup
+*.parquet
+*.csv
+*.tsv
+artifacts/private/
+data/private/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
