@@ -33,3 +33,4 @@ data/private/
 .DS_Store
 .vscode/
 .idea/
+.vercel

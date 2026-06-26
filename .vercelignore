@@ -4,14 +4,14 @@
 !.env.example
 
 # Local private handoff files and controlled data
-artifacts/private/
-data/private/
-data/
-*.csv
-*.tsv
-*.parquet
-*.dump
-*.backup
+/artifacts/private/
+/data/private/
+/data/
+/*.csv
+/*.tsv
+/*.parquet
+/*.dump
+/*.backup
 
 # Local development and build output
 node_modules/
